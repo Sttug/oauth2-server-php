@@ -6,7 +6,7 @@ use OAuth2\OpenID\Storage\UserClaimsInterface;
 use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
 
 /**
- * Simple PDO storage for all storage types
+ * Simple PDO storage for Oracle
  *
  * NOTE: This class is meant to get users started
  * quickly. If your application requires further
@@ -165,7 +165,7 @@ class Oracle implements
         oci_bind_by_name($stmt,':access_token',$access_token);
         oci_bind_by_name($stmt,':client_id',$client_id);
         oci_bind_by_name($stmt,':user_id',$user_id);
-		oci_bind_by_name($stmt,':expires',$expires);
+	oci_bind_by_name($stmt,':expires',$expires);
         oci_bind_by_name($stmt,':scope',$scope);
         if(oci_execute($stmt)){
         	 return true;
@@ -207,7 +207,7 @@ class Oracle implements
         if ($this->getAuthorizationCode($code)) {
             $stmt = oci_parse($this->db, $sql = sprintf('UPDATE %s SET client_id=:client_id, user_id=:user_id, redirect_uri=:redirect_uri, expires=:expires, scope=:scope where authorization_code=:code', $this->config['code_table']));
         } else {
-            $stmt = oci_parse($this->db, sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope) VALUES (:code, :client_id, :user_id, :redirect_uri, :expires, :scope)', $this->config['code_table']));
+            $stmt = oci_parse($this->db, sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope) VALUES (:code, :client_id, :user_id, :redirect_uri, TO_TIMESTAMP(:expires, 'YYYY-MM-DD HH24:MI:SS.FF'), :scope)', $this->config['code_table']));
         }
 
         oci_bind_by_name($stmt,':code',$code);
@@ -231,7 +231,7 @@ class Oracle implements
         if ($this->getAuthorizationCode($code)) {
             $stmt = oci_parse($this->db, $sql = sprintf('UPDATE %s SET client_id=:client_id, user_id=:user_id, redirect_uri=:redirect_uri, expires=:expires, scope=:scope, id_token =:id_token where authorization_code=:code', $this->config['code_table']));
         } else {
-            $stmt = oci_parse($this->db, sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope, id_token) VALUES (:code, :client_id, :user_id, :redirect_uri, :expires, :scope, :id_token)', $this->config['code_table']));
+            $stmt = oci_parse($this->db, sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope, id_token) VALUES (:code, :client_id, :user_id, :redirect_uri, TO_TIMESTAMP(:expires, 'YYYY-MM-DD HH24:MI:SS.FF'), :scope, :id_token)', $this->config['code_table']));
         }
         oci_bind_by_name($stmt,':code',$code);
         oci_bind_by_name($stmt,':client_id',$client_id);
@@ -525,83 +525,115 @@ class Oracle implements
      * @see https://github.com/dsquier/oauth2-server-php-mysql
      */
     public function getBuildSql($dbName = 'oauth2_server_php'){
-    	$sql = "
-    	CREATE TABLE {$this->config['client_table']} (
-    	client_id             VARCHAR(80)   NOT NULL,
-    	client_secret         VARCHAR(80)   NOT NULL,
-    	redirect_uri          VARCHAR(2000),
-    	grant_types           VARCHAR(80),
-    	scope                 VARCHAR(4000),
-    	user_id               VARCHAR(80),
-    	PRIMARY KEY (client_id)
-    	);
+    	$sql = '
+    	
+  CREATE TABLE "OAUTH_ACCESS_TOKENS" 
+   (	"ACCESS_TOKEN" VARCHAR2(40), 
+	"CLIENT_ID" VARCHAR2(80), 
+	"USER_ID" VARCHAR2(80), 
+	"EXPIRES" TIMESTAMP (6), 
+	"SCOPE" VARCHAR2(4000)
+   ) ;
 
-    	CREATE TABLE {$this->config['access_token_table']} (
-    	access_token         VARCHAR2(40)    NOT NULL,
-    	client_id            VARCHAR2(80)    NOT NULL,
-    	user_id              VARCHAR2(80),
-    	expires              VARCHAR2(40)       NOT NULL,
-    	scope                VARCHAR2(4000),
-    	PRIMARY KEY (access_token)
-    	);
+  CREATE TABLE "OAUTH_AUTHORIZATION_CODES" 
+   (	"AUTHORIZATION_CODE" VARCHAR2(40), 
+	"CLIENT_ID" VARCHAR2(80), 
+	"USER_ID" VARCHAR2(80), 
+	"REDIRECT_URI" VARCHAR2(2000), 
+	"EXPIRES" TIMESTAMP (6), 
+	"SCOPE" VARCHAR2(4000), 
+	"ID_TOKEN" VARCHAR2(1000)
+   ) ;
 
-    	CREATE TABLE {$this->config['code_table']} (
-    	authorization_code  VARCHAR2(40)    NOT NULL,
-    	client_id           VARCHAR2(80)    NOT NULL,
-    	user_id             VARCHAR2(80),
-    	redirect_uri        VARCHAR2(2000),
-    	expires             VARCHAR2(80)      NOT NULL,
-    	scope               VARCHAR2(4000),
-    	id_token            VARCHAR2(1000),
-    	PRIMARY KEY (authorization_code)
-    	);
+  CREATE TABLE "OAUTH_CLIENTS" 
+   (	"CLIENT_ID" VARCHAR2(80), 
+	"CLIENT_SECRET" VARCHAR2(80), 
+	"REDIRECT_URI" VARCHAR2(2000), 
+	"GRANT_TYPES" VARCHAR2(80), 
+	"SCOPE" VARCHAR2(4000), 
+	"USER_ID" VARCHAR2(80)
+   ) ;
 
-    	CREATE TABLE {$this->config['refresh_token_table']} (
-    	refresh_token       VARCHAR2(40)    NOT NULL,
-    	client_id           VARCHAR2(80)    NOT NULL,
-    	user_id             VARCHAR2(80),
-    	expires             VARCHAR2(80)      NOT NULL,
-    	scope               VARCHAR2(4000),
-    	PRIMARY KEY (refresh_token)
-    	);
+  CREATE TABLE "OAUTH_JWT" 
+   (	"CLIENT_ID" VARCHAR2(80), 
+	"SUBJECT" VARCHAR2(80), 
+	"PUBLIC_KEY" VARCHAR2(2000)
+   ) ;
 
-    	CREATE TABLE {$this->config['user_table']} (
-    	username            VARCHAR(80),
-    	password            VARCHAR(80),
-    	first_name          VARCHAR(80),
-    	last_name           VARCHAR(80),
-    	email               VARCHAR(80),
-    	email_verified      CHAR(1),
-    	scope               VARCHAR(4000)
-    	);
+  CREATE TABLE "OAUTH_REFRESH_TOKENS" 
+   (	"REFRESH_TOKEN" VARCHAR2(40), 
+	"CLIENT_ID" VARCHAR2(80), 
+	"USER_ID" VARCHAR2(80), 
+	"EXPIRES" TIMESTAMP (6), 
+	"SCOPE" VARCHAR2(4000)
+   ) ;
 
-    	CREATE TABLE {$this->config['scope_table']} (
-    	scope               VARCHAR(80)  NOT NULL,
-    	is_default          CHAR(1),
-    	PRIMARY KEY (scope)
-    	);
+  CREATE TABLE "OAUTH_SCOPES" 
+   (	"SCOPE" VARCHAR2(80), 
+	"IS_DEFAULT" NUMBER(1,0)
+   ) ;
 
-    	CREATE TABLE {$this->config['jwt_table']} (
-    	client_id           VARCHAR(80)   NOT NULL,
-    	subject             VARCHAR(80),
-    	public_key          VARCHAR(2000) NOT NULL
-    	);
+  CREATE TABLE "OAUTH_USERS" 
+   (	"USERNAME" VARCHAR2(80), 
+	"PASSWORD" VARCHAR2(80), 
+	"FIRST_NAME" VARCHAR2(80), 
+	"LAST_NAME" VARCHAR2(80), 
+	"EMAIL" VARCHAR2(80), 
+	"EMAIL_VERIFIED" NUMBER(1,0), 
+	"SCOPE" VARCHAR2(4000)
+   ) ;
 
-    	CREATE TABLE {$this->config['jti_table']} (
-    	issuer              VARCHAR(80)   NOT NULL,
-    	subject             VARCHAR(80),
-    	audiance            VARCHAR(80),
-    	expires             VARCHAR(80)   NOT NULL,
-    	jti                 VARCHAR(2000) NOT NULL
-    	);
+  CREATE UNIQUE INDEX "OAUTH_ACCESS_TOKENS_PK" ON "OAUTH_ACCESS_TOKENS" ("ACCESS_TOKEN") 
+  ;
 
-    	CREATE TABLE {$this->config['public_key_table']} (
-    	client_id            VARCHAR(80),
-    	public_key           VARCHAR(2000),
-    	private_key          VARCHAR(2000),
-    	encryption_algorithm VARCHAR(100) DEFAULT 'RS256'
-    	)
-    	";
+  CREATE UNIQUE INDEX "AUTHORIZATION_CODE_PK" ON "OAUTH_AUTHORIZATION_CODES" ("AUTHORIZATION_CODE") 
+  ;
+
+  CREATE UNIQUE INDEX "OAUTH_CLIENTS_PK" ON "OAUTH_CLIENTS" ("CLIENT_ID") 
+  ;
+
+  CREATE UNIQUE INDEX "REFRESH_TOKEN_PK" ON "OAUTH_REFRESH_TOKENS" ("REFRESH_TOKEN") 
+  ;
+
+  CREATE UNIQUE INDEX "SCOPE_PK" ON "OAUTH_SCOPES" ("SCOPE") 
+  ;
+
+  CREATE UNIQUE INDEX "USERNAME_PK" ON "OAUTH_USERS" ("USERNAME") 
+  ;
+
+  ALTER TABLE "OAUTH_ACCESS_TOKENS" MODIFY ("ACCESS_TOKEN" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_ACCESS_TOKENS" MODIFY ("CLIENT_ID" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_ACCESS_TOKENS" MODIFY ("EXPIRES" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_ACCESS_TOKENS" ADD CONSTRAINT "OAUTH_ACCESS_TOKENS_PK" PRIMARY KEY ("ACCESS_TOKEN")
+  USING INDEX  ENABLE;
+
+  ALTER TABLE "OAUTH_AUTHORIZATION_CODES" MODIFY ("AUTHORIZATION_CODE" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_AUTHORIZATION_CODES" MODIFY ("CLIENT_ID" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_AUTHORIZATION_CODES" MODIFY ("EXPIRES" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_AUTHORIZATION_CODES" ADD CONSTRAINT "AUTHORIZATION_CODE_PK" PRIMARY KEY ("AUTHORIZATION_CODE")
+  USING INDEX  ENABLE;
+
+  ALTER TABLE "OAUTH_CLIENTS" MODIFY ("CLIENT_ID" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_CLIENTS" ADD CONSTRAINT "OAUTH_CLIENTS_PK" PRIMARY KEY ("CLIENT_ID")
+  USING INDEX  ENABLE;
+
+  ALTER TABLE "OAUTH_JWT" MODIFY ("CLIENT_ID" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_JWT" MODIFY ("PUBLIC_KEY" NOT NULL ENABLE);
+
+  ALTER TABLE "OAUTH_REFRESH_TOKENS" MODIFY ("REFRESH_TOKEN" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_REFRESH_TOKENS" MODIFY ("CLIENT_ID" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_REFRESH_TOKENS" MODIFY ("EXPIRES" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_REFRESH_TOKENS" ADD CONSTRAINT "REFRESH_TOKEN_PK" PRIMARY KEY ("REFRESH_TOKEN")
+  USING INDEX  ENABLE;
+
+  ALTER TABLE "OAUTH_SCOPES" MODIFY ("SCOPE" NOT NULL ENABLE);
+  ALTER TABLE "OAUTH_SCOPES" ADD CONSTRAINT "SCOPE_PK" PRIMARY KEY ("SCOPE")
+  USING INDEX  ENABLE;
+
+  ALTER TABLE "OAUTH_USERS" ADD CONSTRAINT "USERNAME_PK" PRIMARY KEY ("USERNAME")
+  USING INDEX  ENABLE;
+
+    	';
 
     	return $sql;
     }
